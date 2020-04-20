@@ -3,8 +3,9 @@ title: "SDS 323 Exercises 3"
 author: "Rylan Keniston"
 date: "4/20/2020"
 output:
-  word_document: default
   pdf_document: default
+  md_document: default
+  word_doxument: default
 ---
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, cache = TRUE, message = FALSE, warning = FALSE)
@@ -20,27 +21,29 @@ library(ggiraphExtra)
 library(foreach)
 library(FNN)
 library(LICORS)
+library(gridExtra)
+```
+
+```{r global_options}
+knitr::opts_chunk$set(fig.path='Figs/')
 ```
 
 # Predictive Model Building
 
-The data being analyzed regarding commercail rental properties from across the Unites States contains twenty-one variables, ranging from the rent amount charged to tenants to the annual precipitation of the buildings' geographoic region to whether or not the building is economically-green certified. The full list of variables can be seen in the preview of the data below. 
-
+The data being analyzed regarding commercail rental properties from across the Unites States contains twenty-one variables, ranging from the rent amount charged to tenants to the annual precipitation of the buildings' geographoic region to whether or not the building is economically-green certified.
 ```{r}
 greenbuildings = read.csv("https://github.com/jgscott/SDS323/raw/master/data/greenbuildings.csv")
-glimpse(greenbuildings)
 ```
 
-## What is the best model for predicting price?
+# What is the best model for predicting price?
 
 There are many different models that can be used to predict the prices of the buildings in our dataset. Once the different models have been established, the Roor Mean Square Errors (RMSE) of each model are compared to identify which predictive model is the most accurate.
-Although the prices of the buildings is not a variable in the data set, I have combined rent, gas costs, and electricity costs in order to create a price variable for each building. Whether or not a building is LEED certified and whether or not a building is Energystar certified were decided to keep seperately, as each of the two indicates it's own specific kinds of green certifications. the building ID column has also been removed. A preview of the altered data can be seen below.
+Although the prices of the buildings is not a variable in the data set, I have combined rent, gas costs, and electricity costs in order to create a price variable for each building. Whether or not a building is LEED certified and whether or not a building is Energystar certified were decided to keep seperately, as each of the two indicates it's own specific kinds of green certifications. the building ID column has also been removed.
 
 ```{r}
 greenb = greenbuildings %>% 
   mutate(Price = Rent + Gas_Costs + Electricity_Costs, Rent = NULL, Gas_Costs = NULL, Electricity_Costs = NULL)
 greenb = greenb[-1]
-glimpse(greenb)
 ```
 
 # Linear regression
@@ -65,7 +68,6 @@ rmse_values = do(100)*{
   }
   c(rmse(greenb_test$Price, yhat_test))
 }
-summary(lm1)
 ggPredict(lm1, data = greenb_test, colorn = 1, interactive = FALSE, size=1)  +
   scale_colour_gradient(low = "lightskyblue", high = "dodgerblue4", guide = "colourbar")
 
@@ -75,16 +77,21 @@ b = coef_matrix[2]
 c = coef_matrix[3]
 d = coef_matrix[4]
 lm_formula = str_c("Price = ", a," + ", b,"*(age) + ", c,"*(stories) + ", d,"*(green_rating)")
+r_val1 = summary(lm1)$r.squared
 RMSE1 = colMeans(rmse_values)
-RMSE1
 ```
 
-Here is a visual of the predicted values of the linear model shown against the actual values for green versus non green buildings (nongreen=0, green=1), as well as a summary of the result. Looking at the coefficients, the predictive formula for price was able to be determined as
-`lm_formula`
-"The adjusted R-squared value is pretty low, which reflects a model that fits the data poorly. We can also conclude from the plots that the model might not be a great fit since the residuals for both green and non-green buildings seem to be pretty large. The calculated RMSE value is
-`RMSE1`
-which will be compared to our other models later on."
+Here is a visual of the predicted values of the linear model shown against the actual values for green versus non green buildings (nongreen=0, green=1), as well as a summary of the result. Looking at the coefficients, the predictive formula for price was able to be determined.
+```{r}
+lm_formula = str_c("Price = ", a," + ", b,"*(age) + ", c,"*(stories) + ", d,"*(green_rating)")
+lm_formula
+```
+The adjusted R-squared value is pretty low, which reflects a model that fits the data poorly. We can also conclude from the plots that the model might not be a great fit since the residuals for both green and non-green buildings seem to be pretty large. The calculated RMSE value will be compared to our other models later on.
 
+```{r}
+cat("RMSE =", RMSE1)
+cat("R-squared =", r_val1)
+```
 ```{r}
  # figure out what these mean later
 #plot(lin_mod)
@@ -94,24 +101,15 @@ which will be compared to our other models later on."
 
 # Stepwise linear regression
 
-Now, instead of coming up with a linear model using variables that I think significantly impact building prices, I used stepwise selections to take the base model I created and add variables that will make the multiple regression model more accurate in it's prediction of price. The linear model using the stepwise selection method is described below along with the model's coefficients and summary of it's statistic values.
+Now, instead of coming up with a linear model using variables that I think significantly impact building prices, I used stepwise selections to take the base model I created and add variables that will make the multiple regression model more accurate in it's prediction of price. After the linear model using the stepwise selection method was created, it's statistic values were found.
 
 ```{r,include = FALSE}
 lm_step = step(lm1,
                scope=~(. + cluster + size + empl_gr + leasing_rate + renovated + net + class_a + class_b + amenities + cd_total_07 + hd_total07 + total_dd_07 + Precipitation + cluster_rent)^2)
-
 ```
 
 ```{r}
-summary(lm_step)
-
 r_val = summary(lm_step)$r.squared
-```
-
-The r-squared value of `r_val` reveals that this model fits the data pretty well. This value is higher than the previous linear regression, hinting that this stepwise selected model is accurate at predicting building prices.
-We will use the 100 training/testing procedure used earlier to once again calculate a reliable RMSE value. The RMSE for our stepwise linear model is `RMSE2`, which is in the same ballpark as our first linear regression model.
-
-```{r}
 rmse_values2 = do(100)*{
   n = nrow(greenb)
   n_train = round(0.8*n)
@@ -126,9 +124,11 @@ rmse_values2 = do(100)*{
   c(rmse(greenb_test$Price, yhat_test))
 }
 RMSE2 = colMeans(rmse_values2)
-cat(" RMSE = ", RMSE2)
+cat("R-squared =", r_val)
+cat("RMSE =", RMSE2)
 ```
 
+The r-squared value reveals that this model fits the data pretty well. This value is higher than the previous linear regression, hinting that this stepwise selected model is more accurate at predicting building prices. We udes the same 100 training/testing procedure used earlier to once again calculate a reliable RMSE value. The RMSE for our stepwise linear model is very similar to that of our first linear model, indicating the two models may not be too different in their predicting accuracies.
 
 # What causes what?
 
@@ -141,22 +141,19 @@ This is because the assumption you're making about the correlation may not be ac
 The researchers were able to isolate this affect by looking at confounding variables during times when police on the streets was higher during for non-crime related reasons. They noticed that the times when the terrorist threat level was raised to orange seem to have aligned with their other data, which led them to question if raised threat levels, which leads more cops to be on the streats, was actually the reason crime was lower. Before they could correctly make this conclusion, they checked to see if the there is any correlation between orange level terrorist threat days and the amount of tourists that visited D.C., which is shown in the table that there in fact is not a correlation.
 
 **3. Why did they have to control for Metro ridership? What was that trying to capture?**
+
 The researchers controlled Metro ridership to determine if the reduction in crime was actually becuase the criminals were staying home due to the raised terrorist threat level, which would be seen because other people of the general public would also stay home and would not be riding the metro. 
 
 **4. Below I am showing you "Table 4" from the researchers' paper. Just focus on the first column of the table. Can you describe the model being estimated here? What is the conclusion?**
 
 The model seems to be a predictive model describing the relationship between each variable used and crime. The two variables "High Alert x District 1" and "High Alert x Other Districts" are used to described how orange level threats in District 1 and how orabge level threats in other districs impact crime. Raised alerts in Distric 1 has a significant impact on crime, while raised alerts in other districs has a much smaller impact on crime. The "Log(midday ridership)" variable reaffirms the earlier belief that people are still out an about on high alert days. Overall, I think the model shows that reductions in crime due to more police being out is actually caused by raised terrorist threat levels.
 
-
 # Clustering and PCA
 
 Our data set of various bottles of wine has descriptive properties that include 11 chemical properties and two other variables, color and quality (on a 1-10 scale). The goal was to find a model that could distinguish red wines from white wines, and potentially even sort the higher from the lower quality wines. Below is the summary of the dataset.
-
-
 ```{r}
 wine = read.csv("https://github.com/jgscott/SDS323/raw/master/data/wine.csv")
 #wine = na.omit(wine)
-summary(wine)
 ```
 
 # K-means++
@@ -201,15 +198,16 @@ clusters
 ```
 
 To determine whether K-means successfully formed reasonable clusters of wine, we looked at single plots of each cluster. We were able to roughly visualize the results of our clustering approach by looking at the clusters on a few of the chemical properties.
+
 ```{r}
 #looking at clusters in plots
-ggplot(data = wine) + 
+a1 = ggplot(data = wine) + 
   geom_point(aes(x = alcohol, y = density, color = factor(clust1$cluster)), size=1) +
   labs(title = "Alcohol v Density", xl = "Alcohol", y = "Density", color = "Cluster")
-
-ggplot(data = wine) + 
+a2 = ggplot(data = wine) + 
   geom_point(aes(x = density, y = residual.sugar, color = factor(clust1$cluster)), size=1) +
   labs(title = "Density v Residual sugar", xl = "Density", y = "Residual sugar", color = "Cluster")
+#grid.arrange(a1, a2, ncol = 2)
 ```
 
 Looking at the two plots above, each cluster seemed to be relatively centrally located in a specific region of each plot, which lead us to believe that K-means++ created reasonable clusters of wines from the data.
@@ -224,30 +222,31 @@ wine3 <- wine[which(clust1$cluster == 3),names(wine)]
 wine4 <- wine[which(clust1$cluster == 4),names(wine)]
 wine5 <- wine[which(clust1$cluster == 5),names(wine)]
 
-ggplot(data = wine1) +
+z1 = ggplot(data = wine1) +
   geom_point(aes(x = alcohol, y = density, color = color), size=1) +
   labs(title = "Cluster 1", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_color_manual(values = c("red1", "gray10"))
-ggplot(data = wine2) +
+z2 = ggplot(data = wine2) +
   geom_point(aes(x = alcohol, y = density, color = color), size=1) +
   labs(title = "Cluster 2", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_color_manual(values = c("red1", "gray10"))
-ggplot(data = wine3) +
+z3 = ggplot(data = wine3) +
   geom_point(aes(x = alcohol, y = density, color = color), size=1) +
   labs(title = "Cluster 3", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_color_manual(values = c("red1", "gray10"))
-ggplot(data = wine4) +
+z4 = ggplot(data = wine4) +
   geom_point(aes(x = alcohol, y = density, color = color), size=1) +
   labs(title = "Cluster 4", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_color_manual(values = c("red1", "gray10"))
-ggplot(data = wine5) +
+z5 = ggplot(data = wine5) +
   geom_point(aes(x = alcohol, y = density, color = color), size=1) +
   labs(title = "Cluster 5", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_color_manual(values = c("red1", "gray10"))
+grid.arrange(z1, z2, z3, z4, z5)
 ```
 From the graphs above, clusters 1, 2, and 4 are all predominantly saturated with white wines, while clusters 3 and 5 contain nearly all red wines. This was a good indicator that K-means++ performs well when sorting wine by color.
 
-## PCA
+# PCA
 
 Secondly, instead of clustering to sort the wine bottles in our data, we have created a principal component analysis (PCA) to reduce the number of variables used when describing the data and distinguishing the observations. From the original chemical elements, the PCA algorithm created 11 new summary variables variables, named PC1 to PC11.
 
@@ -273,20 +272,23 @@ To understand how well PCA performs at identifying similar wines, we looked at p
 scores = PCAwine$x
 new_data = merge(wine, scores, by = "row.names")
 
-ggplot(data = new_data) +
+
+plot1 = ggplot(data = new_data) +
   geom_point(aes(x = PC1, y = PC2, color = color), size=1) +
   labs(color = "Color", title = "PC1 v PV2") +
   scale_color_manual(values = c("red1", "gray10"))
 
-ggplot(data = new_data) +
+plot2 = ggplot(data = new_data) +
   geom_point(aes(x = PC1, y = PC3, color = color), size=1) +
   labs(color = "Color", title = "PC1 v PV3") +
   scale_color_manual(values = c("red1", "gray10"))
 
-ggplot(data = new_data) +
+plot3 = ggplot(data = new_data) +
   geom_point(aes(x = PC2, y = PC3, color = color), size=1) +
   labs(color = "Color", title = "PC2 v PV3") +
   scale_color_manual(values = c("red1", "gray10"))
+
+grid.arrange(plot1, plot2, plot3, ncol = 3)
 ```
 In two out of our three graphs, PV1 v PV2 and PV1 v PV3, the observations seem to cluster by wine color pretty well in their own regions. The third graph of PV2 v PV3 still shows significant clustering among wine colors, except the overlapping of the clusters makes it harder to 100% tell how significant the clusters are. Overall, PCA has shown to perform well in sorting the data.
 Regarding the actual values of our summary variables, PC1 looks to be positive for white wines and negative for red wines. For PC2, it seems that half of each color cluster is positive and half is megative. The same goes for PC3. 
@@ -300,30 +302,30 @@ The dimensionality reduction technique that makes the most sense to me for this 
 The visuals of red and white wines in each cluster frome earlier has convinced me that K-means++ is easily capable of distinguishing the reds from the whites. To see whether this method is also capable of sorting the higher from the lower quality wines, I will recreate the plot from before, except labeling each point by quality instead of color.
 
 ```{r}
-ggplot(data = wine1) +
-  geom_point(aes(x = alcohol, y = density, color = quality)) +
+x1 = ggplot(data = wine1) +
+  geom_point(aes(x = alcohol, y = density, color = quality), size=1) +
   labs(title = "Cluster 1", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_colour_gradient(low = "lightskyblue", high = "dodgerblue4", guide = "colourbar")
-ggplot(data = wine2) +
-  geom_point(aes(x = alcohol, y = density, color = quality)) +
+x2 = ggplot(data = wine2) +
+  geom_point(aes(x = alcohol, y = density, color = quality), size=1) +
   labs(title = "Cluster 2", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_colour_gradient(low = "lightskyblue", high = "dodgerblue4", guide = "colourbar")
-ggplot(data = wine3) +
-  geom_point(aes(x = alcohol, y = density, color = quality)) +
+x3 = ggplot(data = wine3) +
+  geom_point(aes(x = alcohol, y = density, color = quality), size=1) +
   labs(title = "Cluster 3", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_colour_gradient(low = "lightskyblue", high = "dodgerblue4", guide = "colourbar")
-ggplot(data = wine4) +
-  geom_point(aes(x = alcohol, y = density, color = quality)) +
+x4 = ggplot(data = wine4) +
+  geom_point(aes(x = alcohol, y = density, color = quality), size=1) +
   labs(title = "Cluster 4", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_colour_gradient(low = "lightskyblue", high = "dodgerblue4", guide = "colourbar")
-ggplot(data = wine5) +
-  geom_point(aes(x = alcohol, y = density, color = quality)) +
+x5 = ggplot(data = wine5) +
+  geom_point(aes(x = alcohol, y = density, color = quality), size=1) +
   labs(title = "Cluster 5", fill = "Color", xlab = "Alcohol", ylab = "Density") +
   scale_colour_gradient(low = "lightskyblue", high = "dodgerblue4", guide = "colourbar")
+grid.arrange(x1, x2, x3, x4, x5)
 ```
 
 This clustering method does not seem to distinguish higher quality and lower quality wines very well. Each cluster has a mix of wines of all quality types. However, thepattern that higher quality wines typically have a higher alcohol concentration and a lower density than lower quality wines can be observed. It is highly possible that there is too much noise in the data set dor clustering to be succeddult. In that case, using PCA might have been a better option for sorting by quality. Another explanation could be that the qualities of the wines may be influenced more by personal preference of those who rated them than the other variables, which may explain why K-means++ was not able to to use the 11 chemical variables to distinguish quality.
-
 
 # Market segmentation
 
@@ -338,49 +340,42 @@ head(freq)
 
 max = apply(summary(freq), 1, max)
 ```
-The summary of the data above can be used to get a rough idea of how often each interest/category was mentioned. The category that had the highest frequency of being categoriezd into it was "chatter". This does not come as a surprise since social media is heavily used to keep in contact with or to "chatter" with others. The chatter frequencies among the observed twitter users is summarized below.
+The summary of the data above can be used to get a rough idea of how often each interest/category was mentioned. The category that had the highest frequency of being categoriezd into it was "chatter". This does not come as a surprise since social media is heavily used to keep in contact with or to "chatter" with others.
 
-Chatter: `max`
-
-This observation provides little to no useful insight on potential market segments that could be used in the designing of NutrientH2O's advertizing strategies.
-
-We determined that principal component analysis could be effective in reducing the 34 categories we were considering into just a few summary variables. These PC variables retain the maximum variance from the data set they are pulled from, and allowed us to categorize the main types of audiences that follow NutrientH2O's twitter account. Becuase 
+We determined that principal component analysis could be effective in reducing the 34 categories we were considering into just a few summary variables. These PC variables retain the maximum variance from the data set they are pulled from, and allowed us to categorize the main types of audiences that follow NutrientH2O's twitter account.
 
 ```{r}
 PCAtweets = prcomp(freq, scale=FALSE)
-summary(PCAtweets)
+#summary(PCAtweets)
 scores = PCAtweets$x
-
-
 ```
 
-All 34 summary variable have been calculated. The first six component variables describe about 56%% of the variance in our data. More specifically, we observed and evaluated the first three, PC1, PC2, and PC3, which combine to explain almost 40% of the data, to evaulate any market segmentations.
-
+After all 34 summary variable had been calculated, we were abpe tp see that the first six component variables describe about 56%% of the variance in our data. More specifically, we observed and evaluated the first three, PC1, PC2, and PC3, which combine to explain almost 40% of the data, to evaulate any market segmentations.
 
 ```{r}
 round(PCAtweets$rotation[,1:3],4)
 ```
 
 We then plotted each pair of components against each other and have color-labeled each point based on its associated "health and nutrition" frequency. By doing this, we are able to identify what other categories are mentioned by twitter users who are interested in health and nutrition.
-
 ```{r}
-ggplot() +
+y1 = ggplot() +
   geom_point(aes(scores[,1], scores[,2], color = tweets$health_nutrition)) +
   labs(title  = "PC1 v PC2", x = "PC1", y = "PC2",
        color = expression(paste("Health and nutrition \n frequency"))) +
   scale_colour_gradient(low = "skyblue1", high = "navyblue", guide = "colourbar")
 
-ggplot() +
+y2 = ggplot() +
   geom_point(aes(scores[,1], scores[,3], color = tweets$health_nutrition)) +
   labs(title  = "PC1 v PC3", x = "PC1", y = "PC3",
        color = expression(paste("Health and nutrition \n frequency"))) +
   scale_colour_gradient(low = "skyblue1", high = "navyblue", guide = "colourbar")
 
-ggplot() +
+y3 = ggplot() +
   geom_point(aes(scores[,2], scores[,3], color = tweets$health_nutrition)) +
   labs(title  = "PC2 v PC3", x = "PC2", y = "PC3",
        color = expression(paste("Health and nutrition \n frequency"))) +
   scale_colour_gradient(low = "skyblue1", high = "navyblue", guide = "colourbar")
+grid.arrange(y1, y2, y3)
 ```
 
 Each pairs-model shows distinguishable clustering of frequency rates for heath and nutrition related tweets. Out first summary variable, PC1, has the highest health and nutrition frequency observations as typically being negative. The second component identifies most of these high frequency observations as being slightly above zero. For PC3 the high frequencies tend to be slightly below zero. These models infer that the PCA method has performed moderately well at distinguishing twitter users by health and nutrition frequency. The clusters of the high frequencies are didentifiable, but not enough to make strong claims.
@@ -390,15 +385,12 @@ From here, we can look at the top categories that are the most significant of ea
 loadings = PCAtweets$rotation
 o1 = order(loadings[,1], decreasing=TRUE)
 group1 = colnames(freq)[head(o1,5)]
-group1
 
 o2 = order(loadings[,2], decreasing=TRUE)
 group2 = colnames(freq)[head(o2,5)]
-group2
 
 o3 = order(loadings[,3], decreasing=TRUE)
 group3 = colnames(freq)[head(o3,5)]
-group3
 
 cat("PC1: #1", group1[1]," #2", group1[2], " #3", group1[3], " #4 ", group1[4])
 cat("PC2: #1", group2[1]," #2", group2[2], " #3", group2[3], " #4 ", group2[4])
