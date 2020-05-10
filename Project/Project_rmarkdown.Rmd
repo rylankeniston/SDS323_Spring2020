@@ -1,0 +1,25 @@
+---
+title: "SDS 323 Project"
+author: "Rylan Keniston"
+date: "4/23/2020"
+output: word_document
+  pdf_documend: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(mosaic)
+library(sas7bdat)
+```
+
+
+
+```{r cars}
+# my dataset
+
+
+```
+
